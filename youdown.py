@@ -6,55 +6,12 @@ import re
 import pytube
 import urllib
 
-import defaults as defs
-
-def init():
-    defs.audio_home = os.path.expanduser(defs.audio_home)
-    if defs.audio_home[0] != '/':
-        print('Provide absolute path for the audio home directory')
-
-    defs.video_home = os.path.expanduser(defs.video_home)
-    if defs.video_home[0] != '/':
-        print('Provide absolute path for the video home directory')
-
-    defs.future_links = os.path.expanduser(defs.future_links)
-    if defs.future_links[0] != '/':
-        defs.future_links = os.path.join(os.path.dirname(os.path.abspath(__file__)), defs.future_links)
-        with open(defs.future_links, 'a') as f:
-            # if the file didn't exist it got created
-            pass
-
-def video_id(link):
-    vid = link[-11:]
-
-    if vid != re.search('[a-zA-Z0-9_-]+', vid).group(0):
-        print("Bad link: %s" % link)
-        sys.exit(0)
-    return vid
-
-def normalise_path(path, audio_only):
-    base_path = defs.audio_home if audio_only else defs.video_home
-    if path == None:
-        path = base_path
-    elif path[0] == '/':
-        pass
-    elif path[0] == '~':
-        path = os.path.expanduser(path)
-    else:
-        path = os.path.join(base_path, path)
-
-    if not os.path.isdir(path):
-        print("Path does not exist or is not a directory: %s" % path)
-        sys.exit(0)
-    return path
-
-def to_yt_link(vid):
-    return "https://www.youtube.com/watch?v=" + vid
+from consts import *
+from helper import *
 
 def download_video(vid, audio_only, path):
-    print(('Downloading %s to %s' % (vid, path)) + ('; audio only' if audio_only else ''))
     try:
-        yt = pytube.YouTube(to_yt_link(vid))
+        yt = pytube.YouTube(id_to_link(vid))
     except urllib.error.URLError as e:
         print("URLError from pytube - no internet? See error log.")
         with open('error-log.txt', 'w') as errlog:
@@ -62,6 +19,7 @@ def download_video(vid, audio_only, path):
         return
 
     title = yt.title
+    print(('Downloading %s (vid: %s) to %s' % (title, vid, path)) + ('; audio only' if audio_only else ''))
 
     if audio_only:
         stream = yt.streams.filter(only_audio=True, file_extension='mp4').first()
@@ -70,7 +28,7 @@ def download_video(vid, audio_only, path):
 
     stream.download(path)
 
-    with open(defs.past_links, 'a') as f:
+    with open(PAST_LINKS, 'a') as f:
         f.write(str((vid, audio_only, path, title)) + '\n')
 
 def get_now(link, audio_only, path):
@@ -83,38 +41,49 @@ def add_link(link, audio_only, path):
     vid = video_id(link)
     path = normalise_path(path, audio_only)
 
-    with open(defs.future_links, 'a') as links_f:
+    with open(FUTURE_LINKS, 'a') as links_f:
         links_f.write(str((vid, audio_only, path)) + '\n')
 
 def get_all(down_audios):
-    with open(defs.future_links, 'r') as links_f:
-        to_download = links_f.readlines()
+    with open(FUTURE_LINKS, 'r') as links_f:
+        links = links_f.readlines()
 
     is_down = [ ]
-    for l in to_download:
+    for l in links:
         (vid, audio_only, path) = eval(l)
+
         if not down_audios or audio_only:
-            download_video(vid, audio_only, path)
             is_down.append(True)
         else:
-            print('Skipping %s as it is not oudio_only' % vid)
             is_down.append(False)
 
-    with open(defs.future_links, 'w') as links_f:
-        for i in len(xrange(is_down)):
-            if not is_down[i]:
-                links_f.write(to_download[i])
+    n_down = sum(is_down)
+    print('Downloading %d links out of %d.' % (n_down, len(links)))
+
+    links_f = open(FUTURE_LINKS, 'w')
+
+    c_down = 1
+    for i in range(len(is_down)):
+        (vid, audio_only, path) = eval(links[i])
+
+        if is_down[i]:
+            print('Downloading %d/%d.' % (c_down, n_down))
+            download_video(vid, audio_only, path)
+            c_down += 1
+        else:
+            print('Skipping %s as its audio_only flag is not set.' % vid)
+            links_f.write(str((vid, audio_only, path)) + '\n')
+
+    links_f.close()
 
 if __name__ == '__main__':
-    init()
-
     parser = argparse.ArgumentParser(
             description='Download audio or video files from Youtube.',
             usage='python youdown.py <command> [<args>]')
 
     parser.add_argument(
             'command',
-            help='The command to execute with its arguments (one of: get-all, add, get-now).')
+            help='The command to execute with its arguments (one of: get-all, add-link, get-now).')
 
     command = parser.parse_args(sys.argv[1:2]).command
 

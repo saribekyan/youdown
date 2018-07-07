@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# point the YOUDOWN_PATH to the directory of the repository
+# then copy this file to /usr/loca/bin
+
+# TODO: use an installer to do all of this.
+
+YOUDOWN_PATH=/Users/hayk/youdown
+
+python3 $YOUDOWN_PATH/youdown.py "$@"
+
