@@ -1,0 +1,15 @@
+The tool is for downloading audio/video files as easily as possible from youtube.
+
+Program name: youdown
+
+Initial requirements:
+- To execute downloads from the to-be-downloaded list run:
+    youdown get-all
+- To add a link to the to-be-downloaded list:
+    youdown add link [path] [-a/--audio]
+- To download now just one link:
+    youdown get-now link [path] [-a/--audio]
+
+Later:
+- No need to run, downloads automatically
+
