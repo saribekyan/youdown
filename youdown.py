@@ -5,9 +5,12 @@ import os.path
 import re
 import pytube
 import urllib
+import shutil
+import time
 
 from consts import *
 from helper import *
+
 
 def download_video(vid, audio_only, path):
     try:
@@ -21,12 +24,55 @@ def download_video(vid, audio_only, path):
     title = yt.title
     print(('Downloading %s (vid: %s) to %s' % (title, vid, path)) + ('; audio only' if audio_only else ''))
 
+    ##### HACKY PROGRESS BAR LOGIC
+    stream_size = 0
+    progress = 0
+    perc = 1
+    start_t = 0
+    def show_progress_bar(stream, chunk, file_handle, bytes_remaining):
+        nonlocal stream_size, progress, perc, start_t
+        if stream_size == 0:
+            stream_size = bytes_remaining
+            start_t = time.time()
+
+            print('Downloading %.1fmb' % (stream_size / (2.0**20)))
+        progress += len(chunk)
+        if progress > perc * stream_size / 100.0:
+            elapsed = time.time() - start_t
+            rate = progress * 1.0 / elapsed
+            remain = bytes_remaining / rate
+
+            sys.stdout.write('\r')
+            sys.stdout.write('[%-50s] %d%% [elapsed: %.1fs remain: %.1fs rate: %dkb/s]' %
+                    ('#'*(perc >> 1), perc, elapsed, remain,
+                    progress / (2.0**10) / elapsed))
+            sys.stdout.flush()
+
+            perc += 1
+        if bytes_remaining == 0:
+            print()
+    #######
+
+    yt.register_on_progress_callback(show_progress_bar)
+
     if audio_only:
         stream = yt.streams.filter(only_audio=True, file_extension='mp4').first()
     else:
         stream = yt.streams.filter(progressive=True, file_extension='mp4').first()
 
     stream.download(path)
+
+    # the stuff below should actually be in on_download_complete callback
+
+    if audio_only:
+        if shutil.which('ffmpeg') is not None:
+            fpath = os.path.join(path, title + '.mp4')
+            if os.path.exists(fpath):
+                print('Converting %s from mp4 to mp3' % title)
+                opath = os.path.join(path, title + '.mp3')
+                os.system('ffmpeg -i "%s" "%s" -v 0' % (fpath, opath))
+        else:
+            print('ffmpeg is not installed; otherwise would convert %s from mp4 to mp3' % title)
 
     with open(PAST_LINKS, 'a') as f:
         f.write(str((vid, audio_only, path, title)) + '\n')
@@ -43,6 +89,8 @@ def add_link(link, audio_only, path):
 
     with open(FUTURE_LINKS, 'a') as links_f:
         links_f.write(str((vid, audio_only, path)) + '\n')
+
+    print('Link %s is added to the future downloads (audio=%s,path=%s)' % (vid, str(audio_only), path)) 
 
 def get_all(down_audios):
     with open(FUTURE_LINKS, 'r') as links_f:
