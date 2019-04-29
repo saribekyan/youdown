@@ -55,10 +55,14 @@ def download_video(vid, audio_only, path):
 
     yt.register_on_progress_callback(show_progress_bar)
 
-    if audio_only:
-        stream = yt.streams.filter(only_audio=True, file_extension='mp4').first()
-    else:
-        stream = yt.streams.filter(progressive=True, file_extension='mp4').first()
+    # Due to some weird youtube stuff A+V is faster to download than just A
+    # Thus, we always get mp4 and if audio only is needed convert
+    stream = yt.streams.filter(progressive=True, file_extension='mp4').first()
+
+    #if audio_only:
+    #    stream = yt.streams.filter(only_audio=True, file_extension='mp4').first()
+    #else:
+    #    stream = yt.streams.filter(progressive=True, file_extension='mp4').first()
 
     stream.download(path)
 
@@ -71,6 +75,7 @@ def download_video(vid, audio_only, path):
                 print('Converting %s from mp4 to mp3' % title)
                 opath = os.path.join(path, title + '.mp3')
                 os.system('ffmpeg -i "%s" "%s" -v 0' % (fpath, opath))
+                os.system('rm "%s"' % fpath)
         else:
             print('ffmpeg is not installed; otherwise would convert %s from mp4 to mp3' % title)
 
