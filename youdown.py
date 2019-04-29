@@ -7,6 +7,7 @@ import pytube
 import urllib
 import shutil
 import time
+from pytube.helpers import safe_filename
 
 from consts import *
 from helper import *
@@ -21,7 +22,7 @@ def download_video(vid, audio_only, path):
             errlog.write(repr(e))
         return
 
-    title = yt.title
+    title = safe_filename(yt.title)
     print(('Downloading %s (vid: %s) to %s' % (title, vid, path)) + ('; audio only' if audio_only else ''))
 
     ##### HACKY PROGRESS BAR LOGIC
